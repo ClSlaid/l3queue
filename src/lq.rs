@@ -140,9 +140,11 @@ impl<T> Drop for LinkedQueue<T> {
 #[cfg(test)]
 mod lq_test {
     use std::{
-        sync::{Arc, Barrier},
+        sync::{
+            atomic::{AtomicI32, Ordering},
+            Arc, Barrier,
+        },
         thread,
-        time::Duration,
     };
 
     use crate::lq::LinkedQueue;
@@ -187,34 +189,46 @@ mod lq_test {
 
     #[test]
     fn test_mpsc() {
+        let pad = 100;
+
+        let flag = Arc::new(AtomicI32::new(3));
+        let flag1 = flag.clone();
+        let flag2 = flag.clone();
+        let flag3 = flag.clone();
         let p1 = Arc::new(LinkedQueue::new());
         let p2 = p1.clone();
         let p3 = p1.clone();
         let c = p1.clone();
 
         let t1 = thread::spawn(move || {
-            for i in 0..100 {
+            for i in 0..pad {
                 p1.enqueue(i);
             }
+            flag1.fetch_sub(1, Ordering::SeqCst);
         });
         let t2 = thread::spawn(move || {
-            for i in 100..200 {
+            for i in pad..(2 * pad) {
                 p2.enqueue(i);
             }
+            flag2.fetch_sub(1, Ordering::SeqCst);
         });
         let t3 = thread::spawn(move || {
-            for i in 200..300 {
+            for i in (2 * pad)..(3 * pad) {
                 p3.enqueue(i);
             }
+            flag3.fetch_sub(1, Ordering::SeqCst);
         });
-        thread::sleep(Duration::from_micros(10));
+
         let mut sum = 0;
-        while let Some(got) = c.dequeue() {
-            sum += got;
+        while flag.load(Ordering::SeqCst) != 0 {
+            if let Some(num) = c.dequeue() {
+                sum += num;
+            }
         }
+
         t1.join().unwrap();
         t2.join().unwrap();
         t3.join().unwrap();
-        assert_eq!(sum, (0..300).sum());
+        assert_eq!(sum, (0..(3 * pad)).sum());
     }
 }
