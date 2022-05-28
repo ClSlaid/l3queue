@@ -1,5 +1,4 @@
 use std::{
-    io::Write,
     ptr,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
@@ -126,18 +125,6 @@ impl<T> LinkedQueue<T> {
         self.len.fetch_sub(1, Ordering::SeqCst);
         unsafe { (*next).item.take() }
     }
-}
-
-fn link_runner<T>(ptr: &NodePtr<T>) {
-    let ptr = ptr.load(Ordering::SeqCst);
-    if ptr.is_null() {
-        println!("-|");
-        return;
-    }
-    // print!("-> {:?} ", ptr);
-    let _ = std::io::stdout().flush();
-    let next = unsafe { &(*ptr).next };
-    // link_runner(next)
 }
 
 impl<T> Drop for LinkedQueue<T> {
