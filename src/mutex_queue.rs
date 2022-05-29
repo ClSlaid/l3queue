@@ -1,16 +1,16 @@
 use std::{collections::LinkedList, sync::Mutex};
-pub struct LockQueue<T> {
+pub struct MutexQueue<T> {
     inner: Mutex<LinkedList<T>>,
 }
 
-impl<T> Default for LockQueue<T> {
+impl<T> Default for MutexQueue<T> {
     fn default() -> Self {
         let inner = Mutex::new(LinkedList::new());
         Self { inner }
     }
 }
 
-impl<T> LockQueue<T> {
+impl<T> MutexQueue<T> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -41,10 +41,10 @@ mod test {
         thread,
     };
 
-    use super::LockQueue;
+    use super::MutexQueue;
     #[test]
     fn test_single() {
-        let q = LockQueue::new();
+        let q = MutexQueue::new();
         q.push(1);
         q.push(1);
         q.push(4);
@@ -62,7 +62,7 @@ mod test {
     fn test_concurrent_send() {
         let pad = 100000_u128;
 
-        let p1 = Arc::new(LockQueue::new());
+        let p1 = Arc::new(MutexQueue::new());
         let p2 = p1.clone();
         let c = p1.clone();
         let ba1 = Arc::new(Barrier::new(3));
@@ -99,7 +99,7 @@ mod test {
         let flag1 = flag.clone();
         let flag2 = flag.clone();
         let flag3 = flag.clone();
-        let p1 = Arc::new(LockQueue::new());
+        let p1 = Arc::new(MutexQueue::new());
         let p2 = p1.clone();
         let p3 = p1.clone();
         let c = p1.clone();

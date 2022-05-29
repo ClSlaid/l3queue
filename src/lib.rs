@@ -1,2 +1,2 @@
-pub mod lock_queue;
 pub mod lq;
+pub mod mutex_queue;
