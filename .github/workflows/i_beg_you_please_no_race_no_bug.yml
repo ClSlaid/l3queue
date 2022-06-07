@@ -20,7 +20,10 @@ jobs:
       with:
         version: 1.2.1
         make_default: true
-    - uses: icepuma/rust-action@master
+    - name: setup rust
+      uses: ATiltedTree/setup-rust@v1
+      with:
+        rust-version: nightly
     - name: Build
       run: cargo build --verbose
     - name: Rudra
