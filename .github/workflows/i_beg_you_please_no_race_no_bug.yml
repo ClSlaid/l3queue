@@ -18,7 +18,6 @@ jobs:
     - uses: actions/checkout@v3
     - uses: warchant/setup-mold@v1
       with:
-        version: 1.2.1
         make_default: true
     - name: setup rust
       uses: ATiltedTree/setup-rust@v1
