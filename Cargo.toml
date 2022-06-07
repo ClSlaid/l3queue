@@ -14,3 +14,4 @@ name = "benchmark"
 harness = false
 
 [dependencies]
+crossbeam = "0.8.1"
