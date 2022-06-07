@@ -124,7 +124,7 @@ impl<T> CrsQueue<T> {
 
                 if self
                     .head
-                    .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed, &guard)
+                    .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed, guard)
                     .is_ok()
                 {
                     guard.defer_destroy(head);
@@ -140,9 +140,10 @@ impl<T> CrsQueue<T> {
 impl<T> Drop for CrsQueue<T> {
     fn drop(&mut self) {
         while self.pop().is_some() {}
-        let guard = epoch::pin();
+        let guard = &epoch::pin();
         unsafe {
-            let _h = self.head.load_consume(&guard).into_owned();
+            let h = self.head.load_consume(guard);
+            guard.defer_destroy(h);
         }
     }
 }
@@ -230,7 +231,7 @@ mod cq_test {
 
     #[test]
     fn test_mpsc() {
-        let pad = 10_0000u128;
+        let pad = 100_0000u128;
 
         let flag = Arc::new(AtomicI32::new(3));
         let flag1 = flag.clone();
@@ -275,7 +276,7 @@ mod cq_test {
 
     #[test]
     fn test_mpmc() {
-        let pad = 10_0000u128;
+        let pad = 10000u128;
 
         let flag = Arc::new(AtomicI32::new(3));
         let flag_c = flag.clone();

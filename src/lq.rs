@@ -51,7 +51,9 @@ impl<T> LinkedQueue<T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        0 == self.len.load(Ordering::SeqCst)
+        self.len
+            .compare_exchange(0, 0, Ordering::Release, Ordering::Relaxed)
+            .is_ok()
     }
 
     pub fn push(&self, item: T) {
@@ -92,27 +94,33 @@ impl<T> LinkedQueue<T> {
     }
 
     pub fn pop(&self) -> Option<T> {
+        let mut data = None;
         if self.is_empty() {
-            return None;
+            return data;
         }
-        let old_head = self.head.load(Ordering::Acquire);
-        let mut head = old_head;
-        let mut next = unsafe { (*head).next.load(Ordering::Acquire) };
-        while self
-            .head
-            .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed)
-            .is_err()
-        {
-            head = self.head.load(Ordering::Acquire);
-            next = unsafe { (*head).next.load(Ordering::Acquire) };
-        }
+        let mut head = self.head.load(Ordering::Acquire);
         unsafe {
+            let mut next = (*head).next.load(Ordering::Acquire);
+            if next.is_null() {
+                return None;
+            }
+
+            data = (*next).item.take();
+            while self
+                .head
+                .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed)
+                .is_err()
+            {
+                head = self.head.load(Ordering::Acquire);
+                next = (*head).next.load(Ordering::Acquire);
+                data = (*next).item.take();
+            }
             // drop `head`
-            Box::from_raw(head)
+            Box::from_raw(head);
         };
         self.len.fetch_sub(1, Ordering::SeqCst);
-        let head = next;
-        unsafe { (*head).item.take() }
+
+        data
     }
 }
 
@@ -191,7 +199,7 @@ mod lq_test {
 
     #[test]
     fn test_mpsc() {
-        let pad = 10_0000u128;
+        let pad = 100_0000u128;
 
         let flag = Arc::new(AtomicI32::new(3));
         let flag1 = flag.clone();
@@ -231,6 +239,67 @@ mod lq_test {
         t1.join().unwrap();
         t2.join().unwrap();
         t3.join().unwrap();
+        assert_eq!(sum, (0..(3 * pad)).sum());
+    }
+
+    #[test]
+    fn test_mpmc() {
+        let pad = 10_0000u128;
+
+        let flag = Arc::new(AtomicI32::new(3));
+        let flag_c = flag.clone();
+        let flag1 = flag.clone();
+        let flag2 = flag.clone();
+        let flag3 = flag.clone();
+
+        let p1 = Arc::new(LinkedQueue::new());
+        let p2 = p1.clone();
+        let p3 = p1.clone();
+        let c1 = p1.clone();
+        let c2 = p1.clone();
+
+        let producer1 = thread::spawn(move || {
+            for i in 0..pad {
+                p1.push(i);
+            }
+            flag1.fetch_sub(1, Ordering::SeqCst);
+        });
+        let producer2 = thread::spawn(move || {
+            for i in pad..(2 * pad) {
+                p2.push(i);
+            }
+            flag2.fetch_sub(1, Ordering::SeqCst);
+        });
+        let producer3 = thread::spawn(move || {
+            for i in (2 * pad)..(3 * pad) {
+                p3.push(i);
+            }
+            flag3.fetch_sub(1, Ordering::SeqCst);
+        });
+
+        let consumer = thread::spawn(move || {
+            let mut sum = 0;
+            while flag_c.load(Ordering::SeqCst) != 0 || !c2.is_empty() {
+                if let Some(num) = c2.pop() {
+                    sum += num;
+                }
+            }
+            sum
+        });
+
+        let mut sum = 0;
+        while flag.load(Ordering::SeqCst) != 0 || !c1.is_empty() {
+            if let Some(num) = c1.pop() {
+                sum += num;
+            }
+        }
+
+        producer1.join().unwrap();
+        producer2.join().unwrap();
+        producer3.join().unwrap();
+
+        let s = consumer.join().unwrap();
+        sum += s;
         assert_eq!(sum, (0..(3 * pad)).sum());
     }
 }
