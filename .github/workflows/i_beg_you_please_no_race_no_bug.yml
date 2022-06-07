@@ -15,7 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+    - uses: warchant/setup-mold@v1
+      with:
+        version: 1.2.1
+        make_default: true
     - uses: icepuma/rust-action@master
     - name: Build
       run: cargo build --verbose
