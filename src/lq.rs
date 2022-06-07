@@ -59,21 +59,30 @@ impl<T> LinkedQueue<T> {
         let node_ptr: *mut Node<T> = Box::into_raw(new_node);
 
         let old_tail = self.tail.load(Ordering::Acquire);
-        let mut tail_next = unsafe { &(*old_tail).next };
-        while tail_next
-            .compare_exchange(
-                ptr::null_mut(),
-                node_ptr,
-                Ordering::Release,
-                Ordering::Relaxed,
-            )
-            .is_err()
-        {
-            let mut tail = tail_next.load(Ordering::Acquire);
-            while unsafe { !(*tail).next.load(Ordering::Acquire).is_null() } {
-                tail = unsafe { (*tail).next.load(Ordering::Acquire) };
+        unsafe {
+            let mut tail_next = &(*old_tail).next;
+            while tail_next
+                .compare_exchange(
+                    ptr::null_mut(),
+                    node_ptr,
+                    Ordering::Release,
+                    Ordering::Relaxed,
+                )
+                .is_err()
+            {
+                let mut tail = tail_next.load(Ordering::Acquire);
+
+                // step to tail
+                loop {
+                    let nxt = (*tail).next.load(Ordering::Acquire);
+                    if nxt.is_null() {
+                        break;
+                    }
+                    tail = nxt;
+                }
+
+                tail_next = &(*tail).next;
             }
-            tail_next = unsafe { &(*tail).next };
         }
         let _ =
             self.tail
@@ -182,7 +191,7 @@ mod lq_test {
 
     #[test]
     fn test_mpsc() {
-        let pad = 10000;
+        let pad = 10_0000u128;
 
         let flag = Arc::new(AtomicI32::new(3));
         let flag1 = flag.clone();

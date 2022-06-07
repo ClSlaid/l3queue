@@ -86,9 +86,8 @@ impl<T> CrsQueue<T> {
                     let nxt = (*tail).next.load(Ordering::Acquire, &guard);
                     if nxt.is_null() {
                         break;
-                    } else {
-                        tail = nxt.as_raw();
                     }
+                    tail = nxt.as_raw();
                 }
 
                 tail_next = &(*tail).next;
@@ -109,25 +108,26 @@ impl<T> CrsQueue<T> {
         if self.is_empty() {
             return None;
         }
-        let guard = epoch::pin();
+        let guard = &epoch::pin();
         let mut data;
         unsafe {
             loop {
-                let head = self.head.load(Ordering::Acquire, &guard);
-                let next = (*head.as_raw()).next.load(Ordering::Acquire, &guard);
+                let head = self.head.load(Ordering::Acquire, guard);
+                let mut next = (*head.as_raw()).next.load(Ordering::Acquire, guard);
 
                 if next.is_null() {
                     return None;
-                } else {
-                    let mut nxt = next.into_owned();
-                    data = nxt.item.take();
                 }
+
+                data = next.deref_mut().item.take();
+                let next = next.into_owned();
 
                 if self
                     .head
                     .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed, &guard)
                     .is_ok()
                 {
+                    guard.defer_destroy(head);
                     break;
                 }
             }
