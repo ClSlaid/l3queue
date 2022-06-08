@@ -105,11 +105,11 @@ impl<T> CrsQueue<T> {
     }
 
     pub fn pop(&self) -> Option<T> {
+        let mut data = None;
         if self.is_empty() {
-            return None;
+            return data;
         }
         let guard = &epoch::pin();
-        let mut data;
         unsafe {
             loop {
                 let head = self.head.load(Ordering::Acquire, guard);
@@ -119,14 +119,12 @@ impl<T> CrsQueue<T> {
                     return None;
                 }
 
-                data = next.deref_mut().item.take();
-                let next = next.into_owned();
-
                 if self
                     .head
                     .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed, guard)
                     .is_ok()
                 {
+                    data = next.deref_mut().item.take();
                     guard.defer_destroy(head);
                     break;
                 }
@@ -276,7 +274,7 @@ mod cq_test {
 
     #[test]
     fn test_mpmc() {
-        let pad = 10000u128;
+        let pad = 10_0000u128;
 
         let flag = Arc::new(AtomicI32::new(3));
         let flag_c = flag.clone();

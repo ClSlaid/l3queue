@@ -1,3 +1,5 @@
+// a lockless empty linked list based queue
+
 use std::{
     ptr,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
