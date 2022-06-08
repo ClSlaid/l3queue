@@ -100,25 +100,27 @@ impl<T> LinkedQueue<T> {
         if self.is_empty() {
             return data;
         }
-        let mut head = self.head.load(Ordering::Acquire);
         unsafe {
-            let mut next = (*head).next.load(Ordering::Acquire);
-            if next.is_null() {
-                return None;
-            }
-
-            data = (*next).item.take();
-            while self
-                .head
-                .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed)
-                .is_err()
-            {
+            let mut head;
+            loop {
                 head = self.head.load(Ordering::Acquire);
-                next = (*head).next.load(Ordering::Acquire);
-                data = (*next).item.take();
+                let next = (*head).next.load(Ordering::Acquire);
+
+                if next.is_null() {
+                    return None;
+                }
+
+                if self
+                    .head
+                    .compare_exchange(head, next, Ordering::Release, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    data = (*next).item.take();
+                    break;
+                }
             }
             // drop `head`
-            Box::from_raw(head);
+            let _ = Box::from_raw(head);
         };
         self.len.fetch_sub(1, Ordering::SeqCst);
 
