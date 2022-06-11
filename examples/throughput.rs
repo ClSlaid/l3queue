@@ -7,9 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use charts::{
-    AxisPosition, Chart, Color, LineSeriesView, MarkerType, PointLabelPosition, ScaleLinear,
-};
+use charts::{AxisPosition, Chart, Color, LineSeriesView, MarkerType, ScaleLinear};
 use l3queue::{crs_queue::CrsQueue, lq::LinkedQueue, mutex_queue::MutexQueue};
 
 fn main() {
