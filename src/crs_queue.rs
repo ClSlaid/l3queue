@@ -1,3 +1,6 @@
+// based on crossbeam
+// push with casual tail algorithm
+
 use std::{
     io::Write,
     sync::atomic::{AtomicUsize, Ordering},
@@ -147,6 +150,8 @@ impl<T> Drop for CrsQueue<T> {
 }
 
 impl<T> CrsQueue<T> {
+    // used for debugging
+    // walk through the queue and print each node's address
     pub fn walk(&self) {
         let _ = std::io::stdout().flush();
         let guard = epoch::pin();

@@ -1,4 +1,5 @@
 // a lockless empty linked list based queue
+// suffering from UAF and ABA problems
 
 use std::{
     ptr,

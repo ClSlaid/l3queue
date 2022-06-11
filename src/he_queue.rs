@@ -1,3 +1,6 @@
+// based on crossbeam
+// push with strict tail algorithm
+
 use std::{
     io::Write,
     sync::atomic::{AtomicUsize, Ordering},
@@ -56,9 +59,7 @@ impl<T> HeQueue<T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len
-            .compare_exchange(0, 0, Ordering::SeqCst, Ordering::Relaxed)
-            .is_ok()
+        0 == self.len.load(Ordering::SeqCst)
     }
 
     pub fn push(&self, data: T) {
@@ -142,6 +143,8 @@ impl<T> Drop for HeQueue<T> {
 }
 
 impl<T> HeQueue<T> {
+    // used for debugging
+    // walk through the queue and print each element's address
     pub fn walk(&self) {
         let _ = std::io::stdout().flush();
         let guard = epoch::pin();
