@@ -27,6 +27,8 @@ impl<T> Node<T> {
     }
 }
 
+/// WARNING:
+/// LinkedQueue does not fix ABA problem and UAF bug in multi-consumer scenarios
 pub struct LinkedQueue<T> {
     // empty list, which is much more easier to implement
     len: AtomicUsize,
@@ -243,67 +245,6 @@ mod lq_test {
         t1.join().unwrap();
         t2.join().unwrap();
         t3.join().unwrap();
-        assert_eq!(sum, (0..(3 * pad)).sum());
-    }
-
-    #[test]
-    fn test_mpmc() {
-        let pad = 10_0000u128;
-
-        let flag = Arc::new(AtomicI32::new(3));
-        let flag_c = flag.clone();
-        let flag1 = flag.clone();
-        let flag2 = flag.clone();
-        let flag3 = flag.clone();
-
-        let p1 = Arc::new(LinkedQueue::new());
-        let p2 = p1.clone();
-        let p3 = p1.clone();
-        let c1 = p1.clone();
-        let c2 = p1.clone();
-
-        let producer1 = thread::spawn(move || {
-            for i in 0..pad {
-                p1.push(i);
-            }
-            flag1.fetch_sub(1, Ordering::SeqCst);
-        });
-        let producer2 = thread::spawn(move || {
-            for i in pad..(2 * pad) {
-                p2.push(i);
-            }
-            flag2.fetch_sub(1, Ordering::SeqCst);
-        });
-        let producer3 = thread::spawn(move || {
-            for i in (2 * pad)..(3 * pad) {
-                p3.push(i);
-            }
-            flag3.fetch_sub(1, Ordering::SeqCst);
-        });
-
-        let consumer = thread::spawn(move || {
-            let mut sum = 0;
-            while flag_c.load(Ordering::SeqCst) != 0 || !c2.is_empty() {
-                if let Some(num) = c2.pop() {
-                    sum += num;
-                }
-            }
-            sum
-        });
-
-        let mut sum = 0;
-        while flag.load(Ordering::SeqCst) != 0 || !c1.is_empty() {
-            if let Some(num) = c1.pop() {
-                sum += num;
-            }
-        }
-
-        producer1.join().unwrap();
-        producer2.join().unwrap();
-        producer3.join().unwrap();
-
-        let s = consumer.join().unwrap();
-        sum += s;
         assert_eq!(sum, (0..(3 * pad)).sum());
     }
 }
